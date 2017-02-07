@@ -43,6 +43,7 @@
             this.bulk_chapternums = new MaterialSkin.Controls.MaterialSingleLineTextField();
             this.bulk_download = new MaterialSkin.Controls.MaterialRaisedButton();
             this.autofindpages = new MaterialSkin.Controls.MaterialCheckBox();
+            this.bulk_progress = new System.Windows.Forms.ProgressBar();
             ((System.ComponentModel.ISupportInitialize)(this.comic_picture)).BeginInit();
             this.SuspendLayout();
             // 
@@ -250,11 +251,20 @@
             this.autofindpages.UseVisualStyleBackColor = true;
             this.autofindpages.CheckedChanged += new System.EventHandler(this.autofindpages_CheckedChanged);
             // 
+            // bulk_progress
+            // 
+            this.bulk_progress.Location = new System.Drawing.Point(473, 254);
+            this.bulk_progress.Name = "bulk_progress";
+            this.bulk_progress.Size = new System.Drawing.Size(169, 10);
+            this.bulk_progress.TabIndex = 36;
+            this.bulk_progress.Visible = false;
+            // 
             // frmDownload
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(645, 325);
+            this.Controls.Add(this.bulk_progress);
             this.Controls.Add(this.autofindpages);
             this.Controls.Add(this.bulk_download);
             this.Controls.Add(this.bulk_chapternums);
@@ -298,5 +308,6 @@
         private MaterialSkin.Controls.MaterialSingleLineTextField bulk_chapternums;
         private MaterialSkin.Controls.MaterialRaisedButton bulk_download;
         private MaterialSkin.Controls.MaterialCheckBox autofindpages;
+        private System.Windows.Forms.ProgressBar bulk_progress;
     }
 }

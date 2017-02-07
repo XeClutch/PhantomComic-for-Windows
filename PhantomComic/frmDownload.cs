@@ -18,7 +18,6 @@ namespace PhantomComic
         // Variables
         int cipher_pagecount = -1;
         WebBrowser comic_browser = new WebBrowser();
-        bool comic_browser_wait = false;
         int download_chapter = 0;
         int download_chapterad = 0;
         bool download_hasdec = false;
@@ -32,18 +31,22 @@ namespace PhantomComic
         private int GetPageCount(string chapter)
         {
             cipher_pagecount = -1;
-            for (int i = 0; i < 3; i++)
+            comic_browser.Navigate("http://www.readcomics.tv/" + download_rccode + "/chapter-" + chapter);
+
+            while (comic_browser.ReadyState != WebBrowserReadyState.Complete)
+                Application.DoEvents();
+
+            HtmlElement element = comic_browser.Document.GetElementById("page_select");
+            if (element != null)
             {
-                comic_browser_wait = true;
-                comic_browser.DocumentCompleted += comic_browser_page_DocumentCompleted;
-                comic_browser.Navigate("http://www.readcomics.tv/" + download_rccode + "/chapter-" + chapter);
-                
-                while (comic_browser_wait)
-                    Application.DoEvents();
-                if (cipher_pagecount != -1)
-                    return cipher_pagecount;
+                string[] buffer = element.InnerText.Split(new char[] { ' ' });
+                int res = 0;
+                if (int.TryParse(buffer[buffer.Length - 2], out res))
+                    cipher_pagecount = res;
+                else
+                    cipher_pagecount = -1;
             }
-            return (cipher_pagecount = -1);
+            return cipher_pagecount;
         }
 
         // Constructor
@@ -62,9 +65,9 @@ namespace PhantomComic
             download_rccode = rccode;
             comic_name.Font = new Font("Roboto", 13f, FontStyle.Regular);
             comic_name.Text = download_name;
+            comic_browser.ScriptErrorsSuppressed = true;
             if (!File.Exists("data\\" + rccode + "\\desc.txt"))
             {
-                comic_browser.ScriptErrorsSuppressed = true;
                 comic_browser.DocumentCompleted += comic_browser_desc_DocumentCompleted;
                 comic_browser.Navigate("http://www.readcomics.tv/comic/" + rccode);
             }
@@ -73,6 +76,7 @@ namespace PhantomComic
             FileStream stream = new FileStream("data\\" + rccode + "\\banner.jpg", FileMode.Open, FileAccess.Read);
             comic_picture.BackgroundImage = Image.FromStream(stream);
             stream.Dispose();
+            autofindpages.Checked = true;
             comic_chapternum.KeyPress += comic_chapternum_KeyPress;
             comic_startpagenum.KeyPress += comic_startpagenum_KeyPress;
             comic_endpagenum.KeyPress += comic_endpagenum_KeyPress;
@@ -104,33 +108,36 @@ namespace PhantomComic
                 comic_browser.DocumentCompleted -= comic_browser_desc_DocumentCompleted;
             }
         }
-        private void comic_browser_page_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
-        {
-            try
-            {
-                HtmlElement element = comic_browser.Document.GetElementById("page_select");
+        //private void comic_browser_page_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
+        //{
+        //    if (comic_browser.ReadyState == WebBrowserReadyState.Complete)
+        //    {
+        //        try
+        //        {
+        //            HtmlElement element = comic_browser.Document.GetElementById("page_select");
 
-                if (element != null)
-                {
-                    string[] buffer = element.InnerText.Split(new char[] { ' ' });
-                    int res = 0;
-                    bool parsed = int.TryParse(buffer[buffer.Length - 2], out res);
-                    if (parsed)
-                        cipher_pagecount = res;
-                    else
-                        cipher_pagecount = -1;
-                    comic_browser_wait = false;
-                    comic_browser.Stop();
-                    comic_browser.DocumentCompleted -= comic_browser_page_DocumentCompleted;
-                }
-            }
-            catch
-            {
-                new MaterialMessageBox("Error", "Unable to fetch comic page count. This chapter may not be hosted.").ShowDialog();
-                comic_browser.Stop();
-                comic_browser.DocumentCompleted -= comic_browser_page_DocumentCompleted;
-            }
-        }
+        //            if (element != null)
+        //            {
+        //                string[] buffer = element.InnerText.Split(new char[] { ' ' });
+        //                int res = 0;
+        //                bool parsed = int.TryParse(buffer[buffer.Length - 2], out res);
+        //                if (parsed)
+        //                    cipher_pagecount = res;
+        //                else
+        //                    cipher_pagecount = -1;
+        //                //comic_browser_wait = false;
+        //                comic_browser.Stop();
+        //                comic_browser.DocumentCompleted -= comic_browser_page_DocumentCompleted;
+        //            }
+        //        }
+        //        catch
+        //        {
+        //            new MaterialMessageBox("Error", "Unable to fetch comic page count. This chapter may not be hosted.").ShowDialog();
+        //            comic_browser.Stop();
+        //            comic_browser.DocumentCompleted -= comic_browser_page_DocumentCompleted;
+        //        }
+        //    }
+        //}
 
         // MaterialCheckBox Events
         private void autofindpages_CheckedChanged(object sender, EventArgs e)
@@ -148,6 +155,7 @@ namespace PhantomComic
                 materialDivider2.Location = new Point(materialDivider2.Location.X, materialDivider2.Location.Y - 23);
                 bulk_chapternums.Location = new Point(bulk_chapternums.Location.X, bulk_chapternums.Location.Y - 23);
                 bulk_download.Location = new Point(bulk_download.Location.X, bulk_download.Location.Y - 23);
+                bulk_progress.Location = new Point(bulk_progress.Location.X, bulk_progress.Location.Y - 23);
             }
             else
             {
@@ -155,6 +163,7 @@ namespace PhantomComic
                 materialDivider2.Location = new Point(materialDivider2.Location.X, materialDivider2.Location.Y + 23);
                 bulk_chapternums.Location = new Point(bulk_chapternums.Location.X, bulk_chapternums.Location.Y + 23);
                 bulk_download.Location = new Point(bulk_download.Location.X, bulk_download.Location.Y + 23);
+                bulk_progress.Location = new Point(bulk_progress.Location.X, bulk_progress.Location.Y + 23);
             }
         }
 
@@ -249,6 +258,9 @@ namespace PhantomComic
             int chapter_finish = int.Parse(split[1]);
             List<int> failed = new List<int>();
 
+            bulk_progress.Visible = true;
+            bulk_progress.Maximum = (chapter_finish - chapter_start) + 1;
+
             for (int i = chapter_start; i <= chapter_finish; i++)
             {
                 int pages = GetPageCount(i.ToString());
@@ -268,7 +280,12 @@ namespace PhantomComic
                 }
                 else
                     failed.Add(i);
+
+                bulk_progress.Value++;
             }
+
+            bulk_progress.Value = 0;
+            bulk_progress.Visible = false;
 
             if (failed.Count > 0)
             {
