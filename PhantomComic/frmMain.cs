@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
@@ -17,7 +18,10 @@ namespace PhantomComic
         // Variables
         List<string> comics_list = new List<string>();
         string credits_link;
-        string[] credits_messages;
+        string[] credits_messages = { "Application by Joshua Ozeri. Controls by Igance Maes. Icon by Cleberman Kalangozilla. Comics hosted on readcomics.tv",
+                                                "If you like a comic support it financially so it can continue to run!",
+                                                "Donate to the application developer for continued development of this project and many others!<|>http://www.paypal.me/papajoshu",
+                                                "This project is now open source!<|>http://www.github.com/xeclutch/phantomcomic-for-windows" };
         Thread credits_thread;
         int curpage = 0;
         Thread download_thread;
@@ -25,17 +29,22 @@ namespace PhantomComic
         // Threads
         private void CreditsUpdate()
         {
-            int i = 0;
             int cnt = 0;
+            int i = 0;
+            string[] queue;
+            if (IsOnline())
+                queue = new WebClient().DownloadString("http://pastebin.com/raw/5PhkGfZ8").Split(new char[] { '\n' });
+            else
+                queue = credits_messages;
+
             while (credits_thread.ThreadState == ThreadState.Running)
             {
                 if (i == 0)
                 {
-                    credits_messages = new WebClient().DownloadString("http://www.pastebin.com/raw/5PhkGfZ8").Split(new string[] { "\r\n" }, StringSplitOptions.None);
-                    cnt = credits_messages.Length;
+                    cnt = queue.Length;
                 }
 
-                string[] split = credits_messages[i].Split(new string[] { "<|>" }, StringSplitOptions.None);
+                string[] split = queue[i].Split(new string[] { "<|>" }, StringSplitOptions.None);
                 if (split.Length > 1)
                 {
                     credits.Cursor = Cursors.Hand;
@@ -57,13 +66,11 @@ namespace PhantomComic
         }
 
         // Methods
-        private void DeleteComic(string comic)
+        private bool IsOnline()
         {
-            Directory.Delete("data\\" + comic, true);
-        }
-        private string GetRCCode(string text)
-        {
-            return text.Replace("{", "").Replace("}", "").Replace("(", "").Replace(")", "").Replace("[", "").Replace("]", "").Replace(":", "").Replace("&", "").Replace("/", "-").Replace("\\", "").Replace("@", "").Replace("'", "").Replace("*", "").Replace("!", "").Replace("+", "").Replace("?", "").Replace(",", "").Replace(" - ", "-").Replace("  ", "-").Replace(" ", "-").ToLower().TrimEnd(new char[] { '-' });
+            Ping ping = new Ping();
+            PingReply reply = ping.Send("google.com", 1000, new byte[32], new PingOptions());
+            return reply.Status == IPStatus.Success;
         }
         private void RefreshList(int page = 0)
         {
@@ -213,97 +220,97 @@ namespace PhantomComic
         // MaterialContextMenuStrip Events
         private void comic1_context_delete_Click(object sender, EventArgs e)
         {
-            DeleteComic(GetRCCode(comics_list[curpage * 6]));
+            ComicUtils.DeleteComic(ComicUtils.GetRCCode(comics_list[curpage * 6]));
             RefreshList(curpage);
         }
         private void comic1_context_download_Click(object sender, EventArgs e)
         {
-            new frmDownload(GetRCCode(comics_list[curpage * 6])).ShowDialog();
+            new frmDownload(ComicUtils.GetRCCode(comics_list[curpage * 6])).ShowDialog();
         }
         private void comic1_context_open_Click(object sender, EventArgs e)
         {
-            if (Directory.Exists("data\\" + GetRCCode(comics_list[curpage * 6]) + "\\comic"))
-                new frmViewer(GetRCCode(comics_list[curpage * 6])).ShowDialog();
+            if (Directory.Exists("data\\" + ComicUtils.GetRCCode(comics_list[curpage * 6]) + "\\comic"))
+                new frmViewer(ComicUtils.GetRCCode(comics_list[curpage * 6])).ShowDialog();
             else
                 new MaterialMessageBox("Error", "In order to read this comic you must first download parts of it.").ShowDialog();
         }
         private void comic2_context_delete_Click(object sender, EventArgs e)
         {
-            DeleteComic(GetRCCode(comics_list[(curpage * 6) + 1]));
+            ComicUtils.DeleteComic(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 1]));
             RefreshList(curpage);
         }
         private void comic2_context_download_Click(object sender, EventArgs e)
         {
-            new frmDownload(GetRCCode(comics_list[(curpage * 6) + 1])).ShowDialog();
+            new frmDownload(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 1])).ShowDialog();
         }
         private void comic2_context_open_Click(object sender, EventArgs e)
         {
-            if (Directory.Exists("data\\" + GetRCCode(comics_list[(curpage * 6) + 1]) + "\\comic"))
-                new frmViewer(GetRCCode(comics_list[(curpage * 6) + 1])).ShowDialog();
+            if (Directory.Exists("data\\" + ComicUtils.GetRCCode(comics_list[(curpage * 6) + 1]) + "\\comic"))
+                new frmViewer(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 1])).ShowDialog();
             else
                 new MaterialMessageBox("Error", "In order to read this comic you must first download parts of it.").ShowDialog();
         }
         private void comic3_context_delete_Click(object sender, EventArgs e)
         {
-            DeleteComic(GetRCCode(comics_list[(curpage * 6) + 2]));
+            ComicUtils.DeleteComic(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 2]));
             RefreshList(curpage);
         }
         private void comic3_context_download_Click(object sender, EventArgs e)
         {
-            new frmDownload(GetRCCode(comics_list[(curpage * 6) + 2])).ShowDialog();
+            new frmDownload(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 2])).ShowDialog();
         }
         private void comic3_context_open_Click(object sender, EventArgs e)
         {
-            if (Directory.Exists("data\\" + GetRCCode(comics_list[(curpage * 6) + 2]) + "\\comic"))
-                new frmViewer(GetRCCode(comics_list[(curpage * 6) + 2])).ShowDialog();
+            if (Directory.Exists("data\\" + ComicUtils.GetRCCode(comics_list[(curpage * 6) + 2]) + "\\comic"))
+                new frmViewer(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 2])).ShowDialog();
             else
                 new MaterialMessageBox("Error", "In order to read this comic you must first download parts of it.").ShowDialog();
         }
         private void comic4_context_delete_Click(object sender, EventArgs e)
         {
-            DeleteComic(GetRCCode(comics_list[(curpage * 6) + 3]));
+            ComicUtils.DeleteComic(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 3]));
             RefreshList(curpage);
         }
         private void comic4_context_download_Click(object sender, EventArgs e)
         {
-            new frmDownload(GetRCCode(comics_list[(curpage * 6) + 3])).ShowDialog();
+            new frmDownload(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 3])).ShowDialog();
         }
         private void comic4_context_open_Click(object sender, EventArgs e)
         {
-            if (Directory.Exists("data\\" + GetRCCode(comics_list[(curpage * 6) + 3]) + "\\comic"))
-                new frmViewer(GetRCCode(comics_list[(curpage * 6) + 3])).ShowDialog();
+            if (Directory.Exists("data\\" + ComicUtils.GetRCCode(comics_list[(curpage * 6) + 3]) + "\\comic"))
+                new frmViewer(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 3])).ShowDialog();
             else
                 new MaterialMessageBox("Error", "In order to read this comic you must first download parts of it.").ShowDialog();
         }
         private void comic5_context_delete_Click(object sender, EventArgs e)
         {
-            DeleteComic(GetRCCode(comics_list[(curpage * 6) + 4]));
+            ComicUtils.DeleteComic(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 4]));
             RefreshList(curpage);
         }
         private void comic5_context_download_Click(object sender, EventArgs e)
         {
-            new frmDownload(GetRCCode(comics_list[(curpage * 6) + 4])).ShowDialog();
+            new frmDownload(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 4])).ShowDialog();
         }
         private void comic5_context_open_Click(object sender, EventArgs e)
         {
-            if (Directory.Exists("data\\" + GetRCCode(comics_list[(curpage * 6) + 4]) + "\\comic"))
-                new frmViewer(GetRCCode(comics_list[(curpage * 6) + 4])).ShowDialog();
+            if (Directory.Exists("data\\" + ComicUtils.GetRCCode(comics_list[(curpage * 6) + 4]) + "\\comic"))
+                new frmViewer(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 4])).ShowDialog();
             else
                 new MaterialMessageBox("Error", "In order to read this comic you must first download parts of it.").ShowDialog();
         }
         private void comic6_context_delete_Click(object sender, EventArgs e)
         {
-            DeleteComic(GetRCCode(comics_list[(curpage * 6) + 5]));
+            ComicUtils.DeleteComic(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 5]));
             RefreshList(curpage);
         }
         private void comic6_context_download_Click(object sender, EventArgs e)
         {
-            new frmDownload(GetRCCode(comics_list[(curpage * 6) + 5])).ShowDialog();
+            new frmDownload(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 5])).ShowDialog();
         }
         private void comic6_context_open_Click(object sender, EventArgs e)
         {
-            if (Directory.Exists("data\\" + GetRCCode(comics_list[(curpage * 6) + 5]) + "\\comic"))
-                new frmViewer(GetRCCode(comics_list[(curpage * 6) + 5])).ShowDialog();
+            if (Directory.Exists("data\\" + ComicUtils.GetRCCode(comics_list[(curpage * 6) + 5]) + "\\comic"))
+                new frmViewer(ComicUtils.GetRCCode(comics_list[(curpage * 6) + 5])).ShowDialog();
             else
                 new MaterialMessageBox("Error", "In order to read this comic you must first download parts of it.").ShowDialog();
         }

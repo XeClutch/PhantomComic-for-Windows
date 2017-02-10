@@ -1,4 +1,5 @@
-﻿using MaterialSkin;
+﻿using HtmlAgilityPack;
+using MaterialSkin;
 using MaterialSkin.Controls;
 using System;
 using System.Collections.Generic;
@@ -16,8 +17,6 @@ namespace PhantomComic
     public partial class frmDownload : MaterialForm
     {
         // Variables
-        int cipher_pagecount = -1;
-        WebBrowser comic_browser = new WebBrowser();
         int download_chapter = 0;
         int download_chapterad = 0;
         bool download_hasdec = false;
@@ -26,28 +25,6 @@ namespace PhantomComic
         int download_pageend = 0;
         int download_pagestart = 0;
         string download_rccode = "";
-
-        // Methods
-        private int GetPageCount(string chapter)
-        {
-            cipher_pagecount = -1;
-            comic_browser.Navigate("http://www.readcomics.tv/" + download_rccode + "/chapter-" + chapter);
-
-            while (comic_browser.ReadyState != WebBrowserReadyState.Complete)
-                Application.DoEvents();
-
-            HtmlElement element = comic_browser.Document.GetElementById("page_select");
-            if (element != null)
-            {
-                string[] buffer = element.InnerText.Split(new char[] { ' ' });
-                int res = 0;
-                if (int.TryParse(buffer[buffer.Length - 2], out res))
-                    cipher_pagecount = res;
-                else
-                    cipher_pagecount = -1;
-            }
-            return cipher_pagecount;
-        }
 
         // Constructor
         public frmDownload(string rccode)
@@ -65,11 +42,11 @@ namespace PhantomComic
             download_rccode = rccode;
             comic_name.Font = new Font("Roboto", 13f, FontStyle.Regular);
             comic_name.Text = download_name;
-            comic_browser.ScriptErrorsSuppressed = true;
             if (!File.Exists("data\\" + rccode + "\\desc.txt"))
             {
-                comic_browser.DocumentCompleted += comic_browser_desc_DocumentCompleted;
-                comic_browser.Navigate("http://www.readcomics.tv/comic/" + rccode);
+                comic_description.Text = ComicUtils.RetrieveDescription(rccode);
+
+                File.WriteAllText("data\\" + rccode + "\\desc.txt", comic_description.Text);
             }
             else
                 comic_description.Text = File.ReadAllText("data\\" + rccode + "\\desc.txt");
@@ -82,62 +59,6 @@ namespace PhantomComic
             comic_endpagenum.KeyPress += comic_endpagenum_KeyPress;
             bulk_chapternums.KeyPress += bulk_chapternums_KeyPress;
         }
-
-        // WebBrowser Events
-        private void comic_browser_desc_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
-        {
-            try
-            {
-                HtmlElementCollection elements = comic_browser.Document.GetElementsByTagName("div");
-
-                foreach (HtmlElement element in elements)
-                {
-                    if (element != null && element.GetAttribute("className") == "manga-desc")
-                    {
-                        comic_description.Text = element.InnerText.Split(new string[] { "\r\n\r\n" }, StringSplitOptions.None)[1];
-                        File.WriteAllText("data\\" + download_rccode + "\\desc.txt", comic_description.Text);
-                        comic_browser.Stop();
-                        comic_browser.DocumentCompleted -= comic_browser_desc_DocumentCompleted;
-                    }
-                }
-            }
-            catch
-            {
-                new MaterialMessageBox("Error", "Unable to fetch comic description. This comic may not be hosted.").ShowDialog();
-                comic_browser.Stop();
-                comic_browser.DocumentCompleted -= comic_browser_desc_DocumentCompleted;
-            }
-        }
-        //private void comic_browser_page_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
-        //{
-        //    if (comic_browser.ReadyState == WebBrowserReadyState.Complete)
-        //    {
-        //        try
-        //        {
-        //            HtmlElement element = comic_browser.Document.GetElementById("page_select");
-
-        //            if (element != null)
-        //            {
-        //                string[] buffer = element.InnerText.Split(new char[] { ' ' });
-        //                int res = 0;
-        //                bool parsed = int.TryParse(buffer[buffer.Length - 2], out res);
-        //                if (parsed)
-        //                    cipher_pagecount = res;
-        //                else
-        //                    cipher_pagecount = -1;
-        //                //comic_browser_wait = false;
-        //                comic_browser.Stop();
-        //                comic_browser.DocumentCompleted -= comic_browser_page_DocumentCompleted;
-        //            }
-        //        }
-        //        catch
-        //        {
-        //            new MaterialMessageBox("Error", "Unable to fetch comic page count. This chapter may not be hosted.").ShowDialog();
-        //            comic_browser.Stop();
-        //            comic_browser.DocumentCompleted -= comic_browser_page_DocumentCompleted;
-        //        }
-        //    }
-        //}
 
         // MaterialCheckBox Events
         private void autofindpages_CheckedChanged(object sender, EventArgs e)
@@ -198,11 +119,15 @@ namespace PhantomComic
         {
             if (comic_chapternum.Text != "")
             {
-                int cnt = GetPageCount(comic_chapternum.Text);
-                if (cnt != -1)
+                int cnt = ComicUtils.RetrievePageCount(download_rccode, comic_chapternum.Text);
+                if (cnt > 0)
                     new MaterialMessageBox("Fetch", "There are " + (comic_endpagenum.Text = cnt.ToString()) + " in this chapter.");
+                else if (cnt == (int)ChapterFailReason.DoesntExist)
+                    new MaterialMessageBox("Fetch", "This chapter is not hosted on ReadComicsTV.").ShowDialog();
+                else if (cnt == (int)ChapterFailReason.UnableToReadPageCount)
+                    new MaterialMessageBox("Fetch", "Unable to read this chapter's page count. There may be something wrong with the page, feel free to try again.");
                 else
-                    new MaterialMessageBox("Error", "Unable to determine how many pages are in this chapter. This chapter may not be hosted.").ShowDialog();
+                    new MaterialMessageBox("Fetch", "Unable to get this chapter's page count due to an unknown error.");
             }
         }
 
@@ -237,34 +162,46 @@ namespace PhantomComic
             if (comic_endpagenum.Text != "" && comic_endpagenum.Text != "-1")
                 download_pageend = int.Parse(comic_endpagenum.Text);
             else
-                download_pageend = int.Parse((comic_endpagenum.Text = GetPageCount(chapterstr).ToString()));
+                download_pageend = int.Parse(ComicUtils.RetrievePageCount(download_rccode, chapterstr).ToString());
 
-            ComicDownloadEntry entry;
-            entry.comic_name = download_name;
-            entry.comic_rccode = download_rccode;
-            entry.chapter_ad = download_chapterad;
-            entry.chapter_num = download_chapter;
-            entry.chapter_hasdec = download_hasdec;
-            entry.chapter_hashyp = download_hashyp;
-            entry.page_start = download_pagestart;
-            entry.page_end = download_pageend;
-            entry.resize = comic_resize.Checked;
-            DownloadAssistant.Add(entry);
+            string str = "Unable to download chapter #" + download_chapter + (download_hasdec ? ("." + download_chapterad) : (download_hashyp ? ("-" + download_chapterad) : " "));
+            if (download_pageend > 0)
+            {
+                ComicDownloadEntry entry;
+                entry.comic_name = download_name;
+                entry.comic_rccode = download_rccode;
+                entry.chapter_ad = download_chapterad;
+                entry.chapter_num = download_chapter;
+                entry.chapter_hasdec = download_hasdec;
+                entry.chapter_hashyp = download_hashyp;
+                entry.page_start = download_pagestart;
+                entry.page_end = download_pageend;
+                entry.resize = comic_resize.Checked;
+                DownloadAssistant.Add(entry);
+            }
+            else if (download_pageend == (int)ChapterFailReason.DoesntExist)
+                str += "because it's not hosted on ReadComicsTV.";
+            else if (download_pageend == (int)ChapterFailReason.UnableToReadPageCount)
+                str += "because there was an issue retrieving the page count. You can try again if you'd like.";
+            else
+                str += "because of an unknown error.";
+            if (str.Contains("because"))
+                new MaterialMessageBox("Error", str).ShowDialog();
         }
         private void bulk_download_Click(object sender, EventArgs e)
         {
             string[] split = bulk_chapternums.Text.Split(new char[] { '-' });
             int chapter_start = int.Parse(split[0]);
             int chapter_finish = int.Parse(split[1]);
-            List<int> failed = new List<int>();
+            List<ChapterFail> failed = new List<ChapterFail>();
 
             bulk_progress.Visible = true;
             bulk_progress.Maximum = (chapter_finish - chapter_start) + 1;
 
             for (int i = chapter_start; i <= chapter_finish; i++)
             {
-                int pages = GetPageCount(i.ToString());
-                if (pages != -1)
+                int pages = ComicUtils.RetrievePageCount(download_rccode, i.ToString());
+                if (pages > 0)
                 {
                     ComicDownloadEntry entry;
                     entry.comic_name = download_name;
@@ -279,7 +216,18 @@ namespace PhantomComic
                     DownloadAssistant.Add(entry);
                 }
                 else
-                    failed.Add(i);
+                {
+                    ChapterFail fail;
+                    fail.chapter = i;
+                    fail.reason = (ChapterFailReason)pages;
+                    //if (pages == -2)
+                    //    fail.reason = ChapterFailReason.DoesntExist;
+                    //else if (pages == -3)
+                    //    fail.reason = ChapterFailReason.UnableToReadPageCount;
+                    //else
+                    //    fail.reason = ChapterFailReason.Unknown;
+                    failed.Add(fail);
+                }
 
                 bulk_progress.Value++;
             }
@@ -289,21 +237,19 @@ namespace PhantomComic
 
             if (failed.Count > 0)
             {
-                if (failed.Count > 1)
+                string str = "The following chapters failed to download:\n\n";
+                foreach (ChapterFail fail in failed)
                 {
-                    string str = "Unable to download chapters [";
-                    for (int i = 0; i < failed.Count; i++)
-                    {
-                        if (i == (failed.Count - 1))
-                            str += failed[i].ToString();
-                        else
-                            str += failed[i].ToString() + ", ";
-                    }
-                    str += "]. All other chapters have been queued for download.";
-                    new MaterialMessageBox("Error", str).ShowDialog();
+                    str += "#" + fail.chapter + " - ";
+                    if (fail.reason == ChapterFailReason.DoesntExist)
+                        str += "Chapter not hosted.";
+                    else if (fail.reason == ChapterFailReason.UnableToReadPageCount)
+                        str += "Unable to get page count.";
+                    else if (fail.reason == ChapterFailReason.Unknown)
+                        str += "Unknown error.";
+                    str += "\n";
                 }
-                else
-                    new MaterialMessageBox("Error", "Unable to download chapter " + failed[0] + ". All other chapters have been queued for download.").ShowDialog();
+                new MaterialMessageBox("Error", str).ShowDialog();
             }
         }
     }

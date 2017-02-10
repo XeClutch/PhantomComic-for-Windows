@@ -1,4 +1,5 @@
-﻿using MaterialSkin;
+﻿using HtmlAgilityPack;
+using MaterialSkin;
 using MaterialSkin.Controls;
 using System;
 using System.Collections.Generic;
@@ -14,19 +15,6 @@ namespace PhantomComic
     {
         // Variables
         Dictionary<string, string> comic_list = new Dictionary<string, string>();
-        int comic_loadstep = 0;
-        WebBrowser search_descbrowser = new WebBrowser();
-        WebBrowser search_picbrowser = new WebBrowser();
-
-        // Methods
-        private string FormatSeriesName(string seriesname)
-        {
-            return seriesname.Replace('/', '-').Replace(": ", " - ");
-        }
-        private string GetRCCode(string text)
-        {
-            return text.Replace("{", "").Replace("}", "").Replace("(", "").Replace(")", "").Replace("[", "").Replace("]", "").Replace(":", "").Replace("&", "").Replace("/", "-").Replace("\\", "").Replace("@", "").Replace("'", "").Replace("*", "").Replace("!", "").Replace("+", "").Replace("?", "").Replace(",", "").Replace(" - ", "-").Replace("  ", "-").Replace(" ", "-").ToLower().TrimEnd(new char[] { '-' });
-        }
 
         // Constructor
         public frmImport()
@@ -39,49 +27,11 @@ namespace PhantomComic
             manager.ColorScheme = new ColorScheme(Primary.DeepPurple400, Primary.Grey900, 0, Accent.DeepPurple200, TextShade.BLACK);
 
             // Setup
-            search_descbrowser.ScriptErrorsSuppressed = true;
-            search_picbrowser.ScriptErrorsSuppressed = true;
             search_text.KeyPress += search_text_KeyPress;
             string buffer = new WebClient().DownloadString("http://pastebin.com/raw/351Mc2yQ");
-            string[] lines = buffer.Split(new string[] { "\r\n" }, StringSplitOptions.None);
-            foreach (string line in lines)
-                comic_list.Add(line, GetRCCode(line));
-        }
-
-        // WebBrowser Events
-        private void search_descbrowser_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
-        {
-            HtmlElementCollection elements = search_descbrowser.Document.GetElementsByTagName("div");
-
-            foreach (HtmlElement element in elements)
-            {
-                if (element != null && element.GetAttribute("className") == "manga-desc")
-                {
-                    comic_description.Text = element.InnerText.Split(new string[] { "\r\n\r\n" }, StringSplitOptions.None)[1];
-                    comic_loadstep++;
-                    search_descbrowser.Stop();
-                    search_descbrowser.DocumentCompleted -= search_descbrowser_DocumentCompleted;
-                }
-            }
-        }
-        private void search_picbrowser_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
-        {
-            HtmlElement element = search_picbrowser.Document.GetElementById("series_image");
-
-            if (element != null)
-            {
-                string source = element.OuterHtml.Split(new string[] { "src=\"" }, StringSplitOptions.None)[1].Split(new string[] { "\"" }, StringSplitOptions.None)[0];
-                if (source != "")
-                {
-                    byte[] buffer = new WebClient().DownloadData(source);
-                    MemoryStream stream = new MemoryStream(buffer);
-                    comic_picture.BackgroundImage = Image.FromStream(stream);
-                    stream.Dispose();
-                    comic_loadstep++;
-                    search_picbrowser.Stop();
-                    search_picbrowser.DocumentCompleted -= search_picbrowser_DocumentCompleted;
-                }
-            }
+            string[] comics = buffer.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+            foreach (string comic in comics)
+                comic_list.Add(comic, ComicUtils.GetRCCode(comic));
         }
 
         // MaterialSingleLineTextField Events
@@ -94,26 +44,29 @@ namespace PhantomComic
         // MaterialRaisedButton Events
         private void comic_save_Click(object sender, EventArgs e)
         {
-            if (comic_loadstep == 2)
+            // Check if comic is already saved
+            if (!Directory.Exists("data\\" + comic_list[comic_name.Text]))
             {
-                if (!Directory.Exists("data\\" + comic_list[comic_name.Text]))
-                {
-                    Directory.CreateDirectory("data\\" + comic_list[comic_name.Text]);
-                    File.WriteAllText("data\\" + comic_list[comic_name.Text] + "\\detail.txt", comic_name.Text);
-                    File.WriteAllText("data\\" + comic_list[comic_name.Text] + "\\desc.txt", comic_description.Text);
+                // Create directory
+                Directory.CreateDirectory("data\\" + comic_list[comic_name.Text]);
 
-                    Bitmap bmp = new Bitmap(comic_picture.BackgroundImage);
-                    bmp.Save("data\\" + comic_list[comic_name.Text] + "\\banner.jpg");
-                }
+                // Save metadata
+                File.WriteAllText("data\\" + comic_list[comic_name.Text] + "\\detail.txt", comic_name.Text);
+                File.WriteAllText("data\\" + comic_list[comic_name.Text] + "\\desc.txt", comic_description.Text);
+
+                // Save banner
+                Bitmap bmp = new Bitmap(comic_picture.BackgroundImage);
+                bmp.Save("data\\" + comic_list[comic_name.Text] + "\\banner.jpg");
             }
-            else
-                new MaterialMessageBox("Error", "You need to wait for the comic to load before saving it.").ShowDialog();
         }
         private void search_Click(object sender, EventArgs e)
         {
+            // Setup
             string query = search_text.Text.ToLower();
             string[] keys = comic_list.Keys.ToArray();
             search_results.Items.Clear();
+
+            // Search
             foreach (string key in keys)
                 if (key.ToLower().Contains(query))
                     search_results.Items.Add(key);
@@ -122,16 +75,22 @@ namespace PhantomComic
         // ListBox Events
         private void search_results_SelectedIndexChanged(object sender, EventArgs e)
         {
+            // Setup
+            if (search_results.SelectedIndex < 0) return;
             string key = search_results.GetItemText(search_results.SelectedItem);
             string value = comic_list[key];
             string url = "http://www.readcomics.tv/comic/" + value;
             comic_name.Text = key;
-            comic_description.Text = "Fetching comic description..";
-            comic_loadstep = 0;
-            search_descbrowser.DocumentCompleted += search_descbrowser_DocumentCompleted;
-            search_descbrowser.Navigate(url);
-            search_picbrowser.DocumentCompleted += search_picbrowser_DocumentCompleted;
-            search_picbrowser.Navigate(url);
+
+            // Grab page source
+            string html = new WebClient().DownloadString(url);
+
+            // Get banner
+            comic_picture.Load(ComicUtils.RetrieveBanner(value, html));
+            comic_picture.SizeMode = PictureBoxSizeMode.Zoom;
+
+            // Get description
+            comic_description.Text = ComicUtils.RetrieveDescription(value, html);
         }
     }
 }

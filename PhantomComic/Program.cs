@@ -19,7 +19,7 @@ namespace PhantomComic
         static void Main(string[] args)
         {
             // Setup Console
-            SetWindowPos(GetConsoleWindow(), 0, ((Screen.PrimaryScreen.Bounds.Width / 2) - 870), ((Screen.PrimaryScreen.Bounds.Height / 2) - 250), 0, 0, 0x0001);
+            SetWindowPos(GetConsoleWindow(), 0, 0, 0/*((Screen.PrimaryScreen.Bounds.Height / 2) - 250)*/, 0, 0, 0x0001);
 
             // Format Comics
             string path = "data\\";

@@ -39,6 +39,10 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="HtmlAgilityPack, Version=1.4.6.0, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\Comics\HtmlAgilityPack.dll</HintPath>
+    </Reference>
     <Reference Include="MaterialSkin">
       <HintPath>..\..\GogoComic Ripper\GogoComic Ripper\bin\Debug\MaterialSkin.dll</HintPath>
     </Reference>
@@ -55,8 +59,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ChapterFailReason.cs" />
     <Compile Include="ComicDownloadEntry.cs" />
+    <Compile Include="ComicUtils.cs" />
     <Compile Include="DownloadAssistant.cs" />
+    <Compile Include="ChapterFail.cs" />
     <Compile Include="DownloadState.cs" />
     <Compile Include="frmDownload.cs">
       <SubType>Form</SubType>
