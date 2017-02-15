@@ -55,7 +55,7 @@ namespace PhantomComic
                 File.WriteAllText("data\\" + comic_list[comic_name.Text] + "\\desc.txt", comic_description.Text);
 
                 // Save banner
-                Bitmap bmp = new Bitmap(comic_picture.BackgroundImage);
+                Bitmap bmp = new Bitmap(comic_picture.Image);
                 bmp.Save("data\\" + comic_list[comic_name.Text] + "\\banner.jpg");
             }
         }
